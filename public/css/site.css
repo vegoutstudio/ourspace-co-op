@@ -1,0 +1,135 @@
+:root {
+  --accent: #0F6E6E;
+  --ink: #1C1C1E;
+  --ink-2: #3A3A3F;
+  --muted: #5A5A5F;
+  --ground: #F6F5F2;
+  --card: #FFFFFF;
+  --line: #E4E2DD;
+  --field: #C9C6BF;
+  --track: #ECEAE5;
+  --error: #B42318;
+  --wait-ink: #8A3B00;
+  --wait-bg: #FDEBD8;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Noto Sans TC", system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+a { color: inherit; }
+
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.page { max-width: 560px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ---------- 頁首 ---------- */
+.top {
+  display: flex; align-items: center; gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+  background: var(--card); border-bottom: 1px solid var(--line);
+}
+.top-logo {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; object-fit: cover;
+  background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 17px;
+}
+.top-name { font-size: 16px; font-weight: 700; line-height: 1.3; }
+.top-sub { font-size: 12px; color: var(--muted); }
+.back {
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  border: 0; background: none; padding: 0; margin-left: -8px; cursor: pointer; color: var(--ink);
+}
+
+.cover { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: #DCD9D2; }
+
+.content { display: flex; flex-direction: column; gap: 16px; padding: 20px 16px 24px; flex: 1; }
+
+/* ---------- 標題、卡片 ---------- */
+.badge {
+  align-self: flex-start; font-size: 12px; font-weight: 700; color: var(--accent);
+  background: var(--card); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 10px;
+}
+.badge.off { color: var(--muted); border-color: var(--field); }
+h1 { margin: 0; font-size: 24px; line-height: 1.35; }
+.head { display: flex; flex-direction: column; gap: 10px; }
+
+.card { background: var(--card); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.card h2 { margin: 0; font-size: 15px; }
+.card h3 { margin: 0; font-size: 14px; }
+.text { white-space: pre-line; color: var(--ink-2); font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
+
+.info { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px 8px; font-size: 14px; }
+.info dt { color: var(--muted); }
+.info dd { margin: 0; overflow-wrap: anywhere; }
+
+.meter { display: flex; flex-direction: column; gap: 6px; }
+.meter-row { display: flex; justify-content: space-between; font-size: 14px; }
+.meter-track { height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.meter-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); }
+
+/* ---------- 按鈕 ---------- */
+.btn {
+  display: flex; align-items: center; justify-content: center; width: 100%;
+  min-height: 52px; padding: 0 16px; border-radius: var(--radius); border: 0;
+  background: var(--accent); color: #fff; font: inherit; font-size: 17px; font-weight: 700;
+  text-decoration: none; cursor: pointer;
+}
+.btn:disabled { background: #B9B6AF; cursor: not-allowed; }
+.btn.ghost { background: var(--card); color: var(--ink); border: 1px solid #D6D3CC; font-weight: 500; font-size: 15px; min-height: 48px; }
+.btn.dashed { background: var(--card); color: var(--accent); border: 1px dashed var(--accent); font-size: 15px; min-height: 48px; }
+.btn.small { width: auto; min-height: 36px; font-size: 13px; font-weight: 500; padding: 0 12px; border-radius: 8px; }
+
+/* ---------- 表單 ---------- */
+.notice { background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.7; }
+.person-head { display: flex; justify-content: space-between; align-items: center; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; font-weight: 500; }
+.req { color: var(--error); }
+.field input {
+  height: 46px; border: 1px solid var(--field); border-radius: 10px; padding: 0 12px;
+  font: inherit; font-size: 16px; background: #fff; color: var(--ink); width: 100%;
+}
+.field input[aria-invalid="true"] { border: 2px solid var(--error); }
+.field-error { font-size: 12px; color: var(--error); }
+
+.consent-text {
+  max-height: 140px; overflow-y: auto; background: var(--ground); border-radius: 10px;
+  padding: 12px; font-size: 13px; line-height: 1.7; color: var(--ink-2); white-space: pre-line;
+}
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; cursor: pointer; }
+.check input { width: 22px; height: 22px; margin: 0; flex-shrink: 0; accent-color: var(--accent); }
+
+.alert { background: #FDECEA; color: var(--error); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.center-note { font-size: 12px; color: var(--muted); text-align: center; }
+
+/* ---------- 完成 ---------- */
+.done-head { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding-top: 12px; }
+.done-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; }
+.result-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--track); }
+.result-row:last-child { border-bottom: 0; }
+.chip { font-size: 13px; font-weight: 700; border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+.chip.main { background: var(--accent); color: #fff; }
+.chip.wait { background: var(--wait-bg); color: var(--wait-ink); }
+
+.foot { padding: 20px 16px 28px; text-align: center; font-size: 12px; color: var(--muted); }
+
+.state-page { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 48px 24px; text-align: center; }
+.state-page h1 { font-size: 20px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .done-icon { animation: pop 320ms ease-out; }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "ourspace-co-op",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-05",
+
+  /* 儀表板設定的密鑰不會被部署覆蓋 */
+  "keep_vars": true,
+
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ourspace-co-op-db",
+      "database_id": "747a17ce-3437-4d30-80d0-c56f8d4cad01"
+    }
+  ],
+
+  /* 每天台灣時間 03:00：清除過期登入、到期 6 個月的個資 */
+  "triggers": {
+    "crons": ["0 19 * * *"]
+  }
+}

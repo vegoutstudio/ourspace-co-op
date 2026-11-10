@@ -3,9 +3,6 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-10-05",
   "workers_dev": true,
-
-
-  /* 儀表板設定的密鑰不會被部署覆蓋 */
   "keep_vars": true,
 
   "assets": {
@@ -21,7 +18,6 @@
     }
   ],
 
-  /* 每天台灣時間 03:00：清除過期登入、到期 6 個月的個資 */
   "triggers": {
     "crons": ["0 19 * * *"]
   }

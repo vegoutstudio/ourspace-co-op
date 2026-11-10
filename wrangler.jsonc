@@ -2,6 +2,8 @@
   "name": "ourspace-co-op",
   "main": "src/worker.js",
   "compatibility_date": "2026-10-05",
+  "workers_dev": true,
+
 
   /* 儀表板設定的密鑰不會被部署覆蓋 */
   "keep_vars": true,
@@ -15,7 +17,7 @@
     {
       "binding": "DB",
       "database_name": "ourspace-co-op-db",
-      "database_id": "D1_DATABASE_ID"
+      "database_id": "555020cd-83f5-4547-9e08-a822d3884d17"
     }
   ],
 

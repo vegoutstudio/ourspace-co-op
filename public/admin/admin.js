@@ -248,8 +248,8 @@
 
       function changeStatus(entry, status, force) {
         api("POST", "/api/admin/entries/" + entry.id + "/status", { status: status, force: !!force }).then(function (r) {
-          if (r.success) { toast(entry.nickname + " → " + STATUS_LABEL[status]); renderEntries(unit); return; }
-          if (r.error === "MAIN_FULL" && confirm("正取已滿（" + data.counts.main + " / " + unit.capacity_main + "），仍要把「" + entry.nickname + "」遞補為正取嗎？")) {
+          if (r.success) { toast(entry.display + " → " + STATUS_LABEL[status]); renderEntries(unit); return; }
+          if (r.error === "MAIN_FULL" && confirm("正取已滿（" + data.counts.main + " / " + unit.capacity_main + "），仍要把「" + entry.display + "」遞補為正取嗎？")) {
             changeStatus(entry, status, true);
             return;
           }
@@ -262,13 +262,13 @@
         var actions = [];
         if (canEdit) {
           if (e.status === "wait") actions.push(el("button", { class: "btn small", type: "button", onclick: function () { changeStatus(e, "main"); } }, ["遞補為正取"]));
-          if (e.status === "main") actions.push(el("button", { class: "btn ghost small", type: "button", onclick: function () { if (confirm("把「" + e.nickname + "」改為備取？")) changeStatus(e, "wait"); } }, ["改為備取"]));
-          if (e.status !== "cancelled") actions.push(el("button", { class: "btn ghost small", type: "button", onclick: function () { if (confirm("取消「" + e.nickname + "」的報名？")) changeStatus(e, "cancelled"); } }, ["取消報名"]));
+          if (e.status === "main") actions.push(el("button", { class: "btn ghost small", type: "button", onclick: function () { if (confirm("把「" + e.display + "」改為備取？")) changeStatus(e, "wait"); } }, ["改為備取"]));
+          if (e.status !== "cancelled") actions.push(el("button", { class: "btn ghost small", type: "button", onclick: function () { if (confirm("取消「" + e.display + "」的報名？")) changeStatus(e, "cancelled"); } }, ["取消報名"]));
           if (e.status === "cancelled") actions.push(el("button", { class: "btn ghost small", type: "button", onclick: function () { changeStatus(e, "wait"); } }, ["恢復為備取"]));
           actions.push(el("button", {
             class: "btn ghost small danger", type: "button",
             onclick: function () {
-              if (!confirm("永久刪除「" + e.nickname + "」的報名資料？刪除後無法復原。")) return;
+              if (!confirm("永久刪除「" + e.display + "」的報名資料？刪除後無法復原。")) return;
               api("DELETE", "/api/admin/entries/" + e.id).then(function (r) { toast(r.success ? "已刪除" : errorText(r)); renderEntries(unit); });
             }
           }, ["刪除"]));
@@ -276,12 +276,13 @@
 
         return el("div", { class: "entry" }, [
           el("div", { class: "entry-top" }, [
-            el("span", { class: "entry-name", text: e.nickname }),
+            el("span", { class: "entry-name", text: e.display }),
             el("span", { class: "chip " + e.status, text: chipText })
           ]),
           el("div", { class: "entry-meta" }, [
             e.name ? el("span", { text: e.name }) : null,
             e.phone ? el("a", { href: "tel:" + e.phone, text: e.phone }) : null,
+            e.email ? el("a", { href: "mailto:" + e.email, text: e.email, style: "overflow-wrap:anywhere" }) : null,
             el("span", { class: "hint", text: "報名 " + e.created_at })
           ]),
           actions.length ? el("div", { class: "entry-actions" }, actions) : null
@@ -291,7 +292,7 @@
       unitShell(unit, "entries", [
         el("div", { class: "stats" }, [
           el("div", { class: "stat" }, [el("b", { text: data.counts.main + " / " + unit.capacity_main }), el("span", { text: "正取" })]),
-          el("div", { class: "stat" }, [el("b", { text: data.counts.wait + " / " + unit.capacity_wait }), el("span", { text: "備取" })]),
+          el("div", { class: "stat" }, [el("b", { text: data.counts.wait + " / " + (unit.capacity_wait < 0 ? "不限" : unit.capacity_wait) }), el("span", { text: "備取" })]),
           el("div", { class: "stat" }, [el("b", { text: String(cancelled) }), el("span", { text: "已取消" })])
         ]),
         el("div", { class: "filters" }, [
@@ -378,9 +379,14 @@
   /* ---------- 單位設定／新增單位 ---------- */
   function renderUnitForm(unit) {
     var isNew = !unit;
-    var data = unit || {
-      accent: "#0F6E6E", reg_open: 1, capacity_main: 32, capacity_wait: 8, max_per_submit: 5
-    };
+    var data = Object.assign({}, unit || {
+      accent: "#0F6E6E", reg_open: 1, capacity_main: 32, capacity_wait: -1, max_per_submit: 5,
+      nickname_required: 1, phone_required: 1, email_required: 0,
+      host_show: 1, host_label: "協辦", host_name: "窩室 OurSpace",
+      footer_show: 1, footer_text: "本報名系統由 窩室 OurSpace 提供"
+    });
+    if (data.capacity_wait < 0) data.capacity_wait = "";
+    var checks = {};
     var images = { logo: data.logo_image_id || null, cover: data.cover_image_id || null };
     var inputs = {};
     var errorBox = el("div", { role: "alert" });
@@ -431,11 +437,25 @@
 
     var regOpen = el("input", { type: "checkbox", id: "u-reg_open", checked: !!data.reg_open });
 
+    function checkbox(key, label) {
+      var input = el("input", { type: "checkbox", id: "u-" + key, checked: !!data[key] });
+      checks[key] = input;
+      return el("label", { class: "check", for: "u-" + key }, [input, el("span", { text: label })]);
+    }
+
+    var hostLabel = el("select", { id: "u-host_label" }, [
+      el("option", { value: "協辦", text: "協辦" }),
+      el("option", { value: "主辦", text: "主辦" })
+    ]);
+    hostLabel.value = data.host_label === "主辦" ? "主辦" : "協辦";
+
     function save() {
       errorBox.textContent = "";
       var body = {};
       Object.keys(inputs).forEach(function (key) { body[key] = inputs[key].value; });
       body.reg_open = regOpen.checked;
+      Object.keys(checks).forEach(function (key) { body[key] = checks[key].checked; });
+      body.host_label = hostLabel.value;
       body.logo_image_id = images.logo;
       body.cover_image_id = images.cover;
 
@@ -444,8 +464,10 @@
       api(isNew ? "POST" : "PUT", isNew ? "/api/admin/units" : "/api/admin/units/" + unit.id, body).then(function (r) {
         if (!r.success) {
           errorBox.textContent = "";
-          errorBox.appendChild(el("div", { class: "alert", text: errorText(r) }));
-          (r.fields || []).forEach(function (key) { if (inputs[key]) inputs[key].setAttribute("aria-invalid", "true"); });
+          var fields = r.fields || [];
+          errorBox.appendChild(el("div", { class: "alert", text: fields.indexOf("contact_required") !== -1 ? "手機和 Email 至少要有一個設為必填。" : errorText(r) }));
+          fields.forEach(function (key) { if (inputs[key]) inputs[key].setAttribute("aria-invalid", "true"); });
+          if (fields.indexOf("contact_required") !== -1) { checks.phone_required.setAttribute("aria-invalid", "true"); checks.email_required.setAttribute("aria-invalid", "true"); }
           var first = document.querySelector("[aria-invalid]");
           if (first) first.scrollIntoView({ block: "center" });
           return;
@@ -478,6 +500,23 @@
           el("p", { class: "hint", style: "margin:0", text: "圖片超過 1MB 會自動壓縮。" })
         ]),
         el("section", { class: "card" }, [
+          el("h2", { text: "頁首與頁尾" }),
+          checkbox("host_show", "在單位名稱下方顯示主辦／協辦"),
+          el("div", { class: "two" }, [
+            el("div", { class: "field" }, [el("label", { for: "u-host_label", text: "稱謂" }), hostLabel]),
+            field("host_name", "名稱", "text", { attrs: { maxlength: "40" } })
+          ]),
+          checkbox("footer_show", "顯示頁尾文字"),
+          field("footer_text", "頁尾文字", "text", { attrs: { maxlength: "80" } })
+        ]),
+        el("section", { class: "card" }, [
+          el("h2", { text: "報名欄位" }),
+          el("p", { class: "hint", style: "margin:0", text: "姓名固定必填。手機和 Email 至少要有一個必填；選填欄位有填時一樣會檢查格式與重複。" }),
+          checkbox("nickname_required", "參賽暱稱必填"),
+          checkbox("phone_required", "手機號碼必填"),
+          checkbox("email_required", "Email 必填")
+        ]),
+        el("section", { class: "card" }, [
           el("h2", { text: "合作期間與報名" }),
           el("div", { class: "two" }, [
             field("start_at", "合作開始", "datetime-local", { required: true }),
@@ -488,9 +527,10 @@
           field("reg_deadline", "報名截止", "datetime-local", { hint: "不填就是合作期間內都能報名。" }),
           el("div", { class: "three" }, [
             field("capacity_main", "正取名額", "number", { required: true, attrs: { min: "1", max: "2000", inputmode: "numeric" } }),
-            field("capacity_wait", "備取名額", "number", { required: true, attrs: { min: "0", max: "2000", inputmode: "numeric" } }),
+            field("capacity_wait", "備取名額", "number", { attrs: { min: "0", max: "2000", inputmode: "numeric", placeholder: "不限" } }),
             field("max_per_submit", "一次最多", "number", { required: true, attrs: { min: "1", max: "10", inputmode: "numeric" } })
-          ])
+          ]),
+          el("p", { class: "hint", style: "margin:0", text: "備取名額留空＝無上限，填 0＝不收備取（正取滿就截止）。" })
         ]),
         el("section", { class: "card" }, [
           el("h2", { text: "活動介紹" }),

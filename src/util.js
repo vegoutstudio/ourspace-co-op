@@ -154,3 +154,24 @@ export async function currentConsents(env) {
   for (const row of rows.results || []) result[row.kind] = { id: row.id, body: row.body };
   return result;
 }
+
+/* Email 遮蔽：abcdef@gmail.com → ab***@gmail.com */
+export function maskEmail(email) {
+  const text = String(email || "");
+  const at = text.indexOf("@");
+  if (at < 1) return "";
+  return text.slice(0, Math.min(2, at)) + "***" + text.slice(at);
+}
+
+/* 對外顯示名稱：有暱稱用暱稱，沒有就用遮蔽姓名 */
+export function displayName(nickname, name) {
+  return nickname ? nickname : (maskName(name) || "（未填）");
+}
+
+/* 備取名額：-1 代表無上限 */
+export function waitCapacity(unit) {
+  return unit.capacity_wait < 0 ? Infinity : unit.capacity_wait;
+}
+
+export const DEFAULT_HOST_NAME = "窩室 OurSpace";
+export const DEFAULT_FOOTER_TEXT = "本報名系統由 窩室 OurSpace 提供";

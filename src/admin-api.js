@@ -22,7 +22,8 @@
 
 import {
   ok, fail, readJson, clean, cleanLine, toInt, taiwanNow, cleanDateTime,
-  randomCode, isUniqueError, imageUrl, writeLog, currentConsents
+  randomCode, isUniqueError, imageUrl, writeLog, currentConsents, displayName,
+  DEFAULT_HOST_NAME, DEFAULT_FOOTER_TEXT
 } from "./util.js";
 
 import { getUser, unitRole, isAdminRole, isSafeWrite } from "./auth.js";
@@ -143,10 +144,20 @@ async function saveUnit(request, env, user, unitId) {
     reg_open: body.reg_open ? 1 : 0,
     reg_deadline: body.reg_deadline ? cleanDateTime(body.reg_deadline) : null,
     capacity_main: toInt(body.capacity_main, 1, 2000, null),
-    capacity_wait: toInt(body.capacity_wait, 0, 2000, null),
+    /* 備取名額：留空 = 無上限（存 -1）、0 = 不收備取 */
+    capacity_wait: body.capacity_wait === "" || body.capacity_wait === null || body.capacity_wait === undefined
+      ? -1 : toInt(body.capacity_wait, 0, 2000, null),
     max_per_submit: toInt(body.max_per_submit, 1, 10, null),
     logo_image_id: toInt(body.logo_image_id, 1, 1e9, null),
-    cover_image_id: toInt(body.cover_image_id, 1, 1e9, null)
+    cover_image_id: toInt(body.cover_image_id, 1, 1e9, null),
+    nickname_required: body.nickname_required ? 1 : 0,
+    phone_required: body.phone_required ? 1 : 0,
+    email_required: body.email_required ? 1 : 0,
+    host_show: body.host_show ? 1 : 0,
+    host_label: body.host_label === "主辦" ? "主辦" : "協辦",
+    host_name: cleanLine(body.host_name, 40) || DEFAULT_HOST_NAME,
+    footer_show: body.footer_show ? 1 : 0,
+    footer_text: cleanLine(body.footer_text, 80) || DEFAULT_FOOTER_TEXT
   };
 
   for (const key of Object.keys(TEXT_FIELDS)) data[key] = clean(body[key], TEXT_FIELDS[key]) || null;
@@ -160,6 +171,7 @@ async function saveUnit(request, env, user, unitId) {
   if (data.capacity_main === null) errors.push("capacity_main");
   if (data.capacity_wait === null) errors.push("capacity_wait");
   if (data.max_per_submit === null) errors.push("max_per_submit");
+  if (!data.phone_required && !data.email_required) errors.push("contact_required");
 
   let code = null;
   if (!unitId) {
@@ -235,7 +247,7 @@ async function changeCode(request, env, user, unitId, role) {
 
 async function listEntries(env, unitId, role) {
   const rows = await env.DB.prepare(
-    "SELECT e.id, e.name, e.nickname, e.phone, e.status, e.agreed_at, " +
+    "SELECT e.id, e.name, e.nickname, e.phone, e.email, e.status, e.agreed_at, " +
     "datetime(e.created_at, '+8 hours') AS created_tw, " +
     "CASE WHEN e.status = 'wait' THEN (SELECT COUNT(*) FROM entries w WHERE w.unit_id = e.unit_id AND w.status = 'wait' AND w.id <= e.id) END AS wait_no " +
     "FROM entries e WHERE e.unit_id = ? ORDER BY e.id"
@@ -245,6 +257,7 @@ async function listEntries(env, unitId, role) {
   const list = (rows.results || []).map(function (row) {
     const item = {
       id: row.id,
+      display: displayName(row.nickname, row.name),
       nickname: row.nickname,
       status: row.status,
       wait_no: row.wait_no,
@@ -253,6 +266,7 @@ async function listEntries(env, unitId, role) {
     if (showContact) {
       item.name = row.name;
       item.phone = row.phone;
+      item.email = row.email;
       item.agreed_at = row.agreed_at;
     }
     return item;
@@ -269,13 +283,13 @@ function csvCell(value) {
 async function exportEntries(env, user, unitId) {
   const unit = await env.DB.prepare("SELECT code FROM units WHERE id = ?").bind(unitId).first();
   const rows = await env.DB.prepare(
-    "SELECT e.id, e.name, e.nickname, e.phone, e.status, e.agreed_at, datetime(e.created_at, '+8 hours') AS created_tw, " +
+    "SELECT e.id, e.name, e.nickname, e.phone, e.email, e.status, e.agreed_at, datetime(e.created_at, '+8 hours') AS created_tw, " +
     "CASE WHEN e.status = 'wait' THEN (SELECT COUNT(*) FROM entries w WHERE w.unit_id = e.unit_id AND w.status = 'wait' AND w.id <= e.id) END AS wait_no " +
     "FROM entries e WHERE e.unit_id = ? ORDER BY e.id"
   ).bind(unitId).all();
 
   const label = { main: "正取", wait: "備取", cancelled: "已取消" };
-  const lines = [["編號", "狀態", "備取順位", "姓名", "參賽暱稱", "手機", "報名時間", "同意個資與肖像權時間"].join(",")];
+  const lines = [["編號", "狀態", "備取順位", "姓名", "參賽暱稱", "手機", "Email", "報名時間", "同意個資與肖像權時間"].join(",")];
 
   for (const row of rows.results || []) {
     lines.push([
@@ -286,6 +300,7 @@ async function exportEntries(env, user, unitId) {
       row.nickname,
       /* 用 ="..." 讓 Excel 保留開頭的 0 */
       row.phone ? "=\"" + row.phone + "\"" : "",
+      row.email || "",
       String(row.created_tw || "").slice(0, 16),
       row.agreed_at
     ].map(csvCell).join(","));
@@ -331,7 +346,7 @@ async function setStatus(request, env, user, entry) {
 
 async function deleteEntry(env, user, entry) {
   await env.DB.prepare("DELETE FROM entries WHERE id = ?").bind(entry.id).run();
-  await writeLog(env, user.id, entry.unit_id, "entry_delete", { entry: entry.id, nickname: entry.nickname });
+  await writeLog(env, user.id, entry.unit_id, "entry_delete", { entry: entry.id, display: displayName(entry.nickname, entry.name) });
   return ok({ id: entry.id });
 }
 

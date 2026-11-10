@@ -62,3 +62,5 @@
 .toast.show { opacity: 1; }
 
 .empty { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 0; }
+.check input[aria-invalid="true"] { outline: 2px solid var(--error); outline-offset: 2px; }
+.form .field select { min-height: 46px; }

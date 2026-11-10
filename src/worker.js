@@ -47,7 +47,7 @@ export default {
     await env.DB.batch([
       env.DB.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')"),
       env.DB.prepare(
-        "UPDATE entries SET name = NULL, phone = NULL, updated_at = CURRENT_TIMESTAMP " +
+        "UPDATE entries SET name = NULL, phone = NULL, email = NULL, updated_at = CURRENT_TIMESTAMP " +
         "WHERE unit_id IN (SELECT id FROM units WHERE end_at <= ? AND purged_at IS NULL)"
       ).bind(cutoff),
       env.DB.prepare("UPDATE units SET purged_at = ? WHERE end_at <= ? AND purged_at IS NULL").bind(taiwanNow(), cutoff)

@@ -14,17 +14,22 @@
   var turnstileWidget = null;
   var agree = { privacy: false, portrait: false };
 
-  var FIELD_LABELS = { name: "姓名", nickname: "參賽暱稱", phone: "手機號碼" };
+  var FIELD_LABELS = { name: "姓名", nickname: "參賽暱稱", phone: "手機號碼", email: "Email" };
+  var footerConfig = null;
 
   var PERSON_ERRORS = {
     REQUIRED: "請填寫此欄位",
     TOO_LONG_name: "姓名最多 30 個字",
     TOO_LONG_nickname: "暱稱最多 20 個字",
+    TOO_LONG_email: "Email 太長了",
     INVALID_PHONE: "請輸入 09 開頭的 10 碼手機號碼",
+    INVALID_EMAIL: "Email 格式不正確",
     DUPLICATE_IN_FORM_nickname: "這次報名裡已經有相同暱稱",
     DUPLICATE_IN_FORM_phone: "這次報名裡已經有相同手機號碼",
+    DUPLICATE_IN_FORM_email: "這次報名裡已經有相同 Email",
     NICKNAME_TAKEN: "這個暱稱已經有人使用，請換一個",
-    PHONE_TAKEN: "這支手機號碼已經報名過了"
+    PHONE_TAKEN: "這支手機號碼已經報名過了",
+    EMAIL_TAKEN: "這個 Email 已經報名過了"
   };
 
   var ERRORS = {
@@ -110,13 +115,17 @@
       withBack ? null : logo,
       el("div", null, [
         el("div", { class: "top-name", text: withBack ? "報名" : unit.name }),
-        el("div", { class: "top-sub", text: withBack ? unit.event_title : "協辦：窩室 OurSpace" })
+        withBack
+          ? el("div", { class: "top-sub", text: unit.event_title })
+          : (unit.host && unit.host.show ? el("div", { class: "top-sub", text: unit.host.label + "：" + unit.host.name }) : null)
       ])
     ]);
   }
 
   function footer() {
-    return el("footer", { class: "foot", text: "本報名系統由 窩室 OurSpace 提供" });
+    var config = unit ? unit.footer : footerConfig;
+    if (!config || !config.show || !config.text) return null;
+    return el("footer", { class: "foot", text: config.text });
   }
 
   function statePage(title, message) {
@@ -140,9 +149,6 @@
   function renderIntro() {
     document.title = unit.event_title + "｜" + unit.name;
 
-    var c = unit.counts;
-    var mainPercent = Math.min(100, Math.round(c.main / unit.capacity_main * 100));
-    var waitPercent = unit.capacity_wait ? Math.min(100, Math.round(c.wait / unit.capacity_wait * 100)) : 0;
     var open = unit.reg_state === "open";
 
     function section(title, body) {
@@ -173,18 +179,6 @@
             unit.reg_deadline ? el("dd", { text: formatTime(unit.reg_deadline) }) : null
           ])
         ]) : null,
-        el("section", { class: "card" }, [
-          el("h2", { text: "報名狀況" }),
-          el("div", { class: "meter" }, [
-            el("div", { class: "meter-row" }, [el("span", { text: "正取" }), el("span", { text: c.main + " / " + unit.capacity_main })]),
-            el("div", { class: "meter-track" }, [el("div", { class: "meter-fill", style: "width:" + mainPercent + "%" })])
-          ]),
-          unit.capacity_wait ? el("div", { class: "meter" }, [
-            el("div", { class: "meter-row" }, [el("span", { text: "備取" }), el("span", { text: c.wait + " / " + unit.capacity_wait })]),
-            el("div", { class: "meter-track" }, [el("div", { class: "meter-fill", style: "width:" + waitPercent + "%" })])
-          ]) : null,
-          unit.capacity_wait ? el("p", { class: "hint", style: "margin:0", text: "正取額滿後自動列入備取，備取遞補由主辦單位通知。" }) : null
-        ]),
         hasIntro ? el("section", { class: "card" }, [
           el("h2", { text: "活動介紹" }),
           unit.intro ? el("div", { class: "text", text: unit.intro }) : null,
@@ -206,18 +200,20 @@
   }
 
   /* ---------- 報名表 ---------- */
-  function newPerson() { return { name: "", nickname: "", phone: "", errors: {} }; }
+  function newPerson() { return { name: "", nickname: "", phone: "", email: "", errors: {} }; }
+
+  function isRequired(key) {
+    return key === "name" || !!(unit.fields && unit.fields[key]);
+  }
 
   function renderRegister(generalError) {
     if (unit.reg_state !== "open") { renderIntro(); return; }
     document.title = "報名｜" + unit.event_title;
     if (!people.length) people.push(newPerson());
 
-    var mainLeft = unit.main_left;
-    var waitLeft = unit.wait_left;
-    var noticeText = mainLeft > 0
-      ? "正取尚餘 " + mainLeft + " 名" + (unit.capacity_wait ? "，額滿後列入備取。" : "。")
-      : "正取已額滿，現在報名將列入備取（備取尚餘 " + waitLeft + " 名）。";
+    var noticeText = unit.main_full
+      ? "正取已額滿，現在報名將列入備取。"
+      : (unit.has_wait ? "名額有限，正取額滿後將列入備取。" : "名額有限，額滿為止。");
 
     var cards = people.map(function (person, index) {
       function field(key, type, extra) {
@@ -230,9 +226,11 @@
           oninput: function (event) { person[key] = event.target.value; }
         }, extra || {}));
         return el("div", { class: "field" }, [
-          el("label", { for: id }, [FIELD_LABELS[key] + " ", el("span", { class: "req", "aria-hidden": "true", text: "*" })]),
+          el("label", { for: id }, isRequired(key)
+            ? [FIELD_LABELS[key] + " ", el("span", { class: "req", "aria-hidden": "true", text: "*" })]
+            : [FIELD_LABELS[key] + " ", el("span", { class: "hint", text: "（選填）" })]),
           input,
-          key === "nickname" ? el("div", { class: "hint", text: "會顯示在比賽名單、對戰表" }) : null,
+          key === "nickname" ? el("div", { class: "hint", text: isRequired("nickname") ? "會顯示在比賽名單、對戰表" : "會顯示在比賽名單、對戰表；沒填會以遮蔽後的姓名顯示" }) : null,
           error ? el("div", { class: "field-error", id: id + "-err", text: error }) : null
         ]);
       }
@@ -247,12 +245,12 @@
         ]),
         field("name", "text", { autocomplete: index === 0 ? "name" : "off", maxlength: "30" }),
         field("nickname", "text", { autocomplete: "off", maxlength: "20" }),
-        field("phone", "tel", { autocomplete: index === 0 ? "tel" : "off", inputmode: "numeric", maxlength: "12", placeholder: "09xxxxxxxx" })
+        field("phone", "tel", { autocomplete: index === 0 ? "tel" : "off", inputmode: "numeric", maxlength: "12", placeholder: "09xxxxxxxx" }),
+        field("email", "email", { autocomplete: index === 0 ? "email" : "off", inputmode: "email", maxlength: "100", autocapitalize: "none", placeholder: "name@example.com" })
       ]);
     });
 
-    var room = mainLeft + waitLeft;
-    var maxPeople = Math.min(unit.max_per_submit, room);
+    var maxPeople = unit.max_per_submit;
 
     var privacyBox = el("input", { type: "checkbox", id: "agree-privacy", checked: agree.privacy, onchange: function (e) { agree.privacy = e.target.checked; } });
     var portraitBox = el("input", { type: "checkbox", id: "agree-portrait", checked: agree.portrait, onchange: function (e) { agree.portrait = e.target.checked; } });
@@ -304,11 +302,14 @@
         person.name = person.name.trim();
         person.nickname = person.nickname.trim();
         person.phone = person.phone.replace(/[\s\-()]/g, "");
+        person.email = person.email.trim();
         person.errors = {};
         if (!person.name) person.errors.name = PERSON_ERRORS.REQUIRED;
-        if (!person.nickname) person.errors.nickname = PERSON_ERRORS.REQUIRED;
-        if (!person.phone) person.errors.phone = PERSON_ERRORS.REQUIRED;
+        if (!person.nickname && isRequired("nickname")) person.errors.nickname = PERSON_ERRORS.REQUIRED;
+        if (!person.phone) { if (isRequired("phone")) person.errors.phone = PERSON_ERRORS.REQUIRED; }
         else if (!/^09\d{8}$/.test(person.phone)) person.errors.phone = PERSON_ERRORS.INVALID_PHONE;
+        if (!person.email) { if (isRequired("email")) person.errors.email = PERSON_ERRORS.REQUIRED; }
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.email)) person.errors.email = PERSON_ERRORS.INVALID_EMAIL;
         if (Object.keys(person.errors).length) hasError = true;
       });
 
@@ -323,7 +324,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          people: people.map(function (p) { return { name: p.name, nickname: p.nickname, phone: p.phone }; }),
+          people: people.map(function (p) { return { name: p.name, nickname: p.nickname, phone: p.phone, email: p.email }; }),
           agree_privacy: true,
           agree_portrait: true,
           privacy_id: unit.consents.privacy.id,
@@ -347,11 +348,6 @@
           });
           renderRegister();
           focusFirstError();
-          return;
-        }
-
-        if (result.error === "NOT_ENOUGH_ROOM") {
-          renderRegister("名額只剩 " + result.room + " 位，請減少報名人數。");
           return;
         }
 
@@ -406,6 +402,8 @@
   /* ---------- 完成 ---------- */
   function renderDone(data) {
     document.title = "報名完成｜" + unit.event_title;
+    var rejected = data.people.some(function (p) { return p.status === "rejected"; });
+    var hasWait = data.people.some(function (p) { return p.status === "wait"; });
 
     render([
       el("main", { class: "content" }, [
@@ -415,15 +413,18 @@
           el("p", { class: "hint", style: "margin:0;font-size:14px", text: data.event_title + (data.event_time ? "・" + data.event_time : "") })
         ]),
         el("section", { class: "card", style: "gap:0;padding:4px 16px" }, data.people.map(function (p) {
+          var chip = p.status === "main" ? "正取" : (p.status === "wait" ? "備取第 " + p.wait_no + " 位" : "未報名成功");
+          var contact = [p.name_masked, p.phone_masked, p.email_masked].filter(Boolean).join("・");
           return el("div", { class: "result-row" }, [
-            el("div", null, [
-              el("div", { style: "font-weight:700", text: p.nickname }),
-              el("div", { class: "hint", text: p.name_masked + "・" + p.phone_masked })
+            el("div", { style: "min-width:0" }, [
+              el("div", { style: "font-weight:700;overflow-wrap:anywhere", text: p.title }),
+              el("div", { class: "hint", style: "overflow-wrap:anywhere", text: contact })
             ]),
-            el("span", { class: "chip " + p.status, text: p.status === "main" ? "正取" : "備取第 " + p.wait_no + " 位" })
+            el("span", { class: "chip " + p.status, text: chip })
           ]);
         })),
-        el("div", { class: "card text", style: "font-size:13px", text: "備取者如有正取名額釋出，將由主辦單位聯繫遞補。\n建議截圖保存此頁。" }),
+        rejected ? el("div", { class: "alert", text: "名額已滿，標示「未報名成功」的報名者沒有完成報名，資料也不會保留。" }) : null,
+        el("div", { class: "card text", style: "font-size:13px", text: (hasWait ? "備取者如有正取名額釋出，將由主辦單位聯繫遞補。\n" : "") + "建議截圖保存此頁。" }),
         el("button", {
           class: "btn ghost", type: "button",
           onclick: function () { reload().then(function () { go(base); }); }
@@ -459,6 +460,7 @@
 
       if (data.state === "ended") {
         unit = null;
+        footerConfig = data.footer;
         document.title = data.event_title + "｜" + data.name;
         statePage("活動已結束", data.name + "「" + data.event_title + "」已經結束，感謝參與。");
         return;

@@ -126,6 +126,20 @@ async function getUnit(env, unitId, role) {
   return ok(data);
 }
 
+/* LINE 官方帳號：接受 @帳號ID 或 LINE 網域的網址，統一存成加好友連結 */
+function normalizeLine(value) {
+  const text = cleanLine(value, 300);
+  if (!text) return { valid: true, url: null };
+  if (/^@[A-Za-z0-9._-]{2,40}$/.test(text)) return { valid: true, url: "https://line.me/R/ti/p/" + text };
+  try {
+    const parsed = new URL(text);
+    if (parsed.protocol === "https:" && ["line.me", "lin.ee", "page.line.me"].indexOf(parsed.hostname) !== -1) {
+      return { valid: true, url: parsed.toString() };
+    }
+  } catch (e) { /* 不是網址 */ }
+  return { valid: false, url: null };
+}
+
 const TEXT_FIELDS = { intro: 3000, rules: 3000, prizes: 3000, notes: 3000, contact: 1000 };
 
 async function saveUnit(request, env, user, unitId) {
@@ -172,6 +186,10 @@ async function saveUnit(request, env, user, unitId) {
   if (data.capacity_wait === null) errors.push("capacity_wait");
   if (data.max_per_submit === null) errors.push("max_per_submit");
   if (!data.phone_required && !data.email_required) errors.push("contact_required");
+
+  const line = normalizeLine(body.line_url);
+  if (!line.valid) errors.push("line_url");
+  data.line_url = line.url;
 
   let code = null;
   if (!unitId) {

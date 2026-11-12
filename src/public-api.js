@@ -101,6 +101,7 @@ async function getUnit(env, code) {
     prizes: unit.prizes,
     notes: unit.notes,
     contact: unit.contact,
+    line_url: unit.line_url || null,
     accent: unit.accent,
     logo_url: imageUrl(unit.logo_image_id),
     cover_url: imageUrl(unit.cover_image_id),

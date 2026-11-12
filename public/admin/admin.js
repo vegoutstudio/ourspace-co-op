@@ -59,8 +59,9 @@
     return node;
   }
 
-  function render(nodes) {
+  function render(nodes, withTabs) {
     app.textContent = "";
+    app.className = "page admin" + (withTabs ? " with-tabs" : "");
     nodes.forEach(function (n) { if (n) app.appendChild(n); });
   }
 
@@ -104,19 +105,31 @@
 
   function toInput(value) { return value ? String(value).replace(" ", "T") : ""; }
 
+  var ICONS = {
+    back: '<path d="M15 18l-6-6 6-6"></path>',
+    list: '<path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle>',
+    users: '<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"></path><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"></path><path d="M18 14.3c2.1.7 3.5 2.8 3.5 5.7"></path>',
+    gear: '<circle cx="12" cy="12" r="3"></circle><path d="M12 3v3"></path><path d="M12 18v3"></path><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="M5.6 5.6l2.1 2.1"></path><path d="M16.3 16.3l2.1 2.1"></path><path d="M5.6 18.4l2.1-2.1"></path><path d="M16.3 7.7l2.1-2.1"></path>'
+  };
+
+  function icon(name, size) {
+    var span = document.createElement("span");
+    span.setAttribute("aria-hidden", "true");
+    span.style.display = "inline-flex";
+    span.innerHTML = '<svg width="' + (size || 22) + '" height="' + (size || 22) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + "</svg>";
+    return span;
+  }
+
   function header(title, sub, backHash) {
-    return el("header", { class: "top" }, [
-      backHash ? el("a", { class: "back", href: backHash, "aria-label": "返回" }, [
-        el("span", { "aria-hidden": "true", style: "font-size:22px;line-height:1", text: "‹" })
-      ]) : null,
-      el("div", { style: "min-width:0" }, [
-        el("div", { class: "top-name", text: title }),
-        sub ? el("div", { class: "top-sub", text: sub }) : null
-      ]),
-      me && !backHash ? el("div", { class: "top-actions" }, [
-        me.user.picture ? el("img", { class: "avatar", src: me.user.picture, alt: "" }) : null,
-        el("button", { class: "btn ghost small", type: "button", onclick: logout }, ["登出"])
-      ]) : null
+    return el("header", { class: "appbar admin-bar" }, [
+      el("div", { class: "admin-bar-inner" }, [
+        backHash ? el("a", { class: "icon-btn", href: backHash, "aria-label": "返回" }, [icon("back")]) : el("span", { style: "width:12px" }),
+        el("div", { class: "appbar-title" }, [el("b", { text: title }), sub ? el("span", { text: sub }) : null]),
+        me && !backHash ? el("div", { class: "top-actions" }, [
+          me.user.picture ? el("img", { class: "avatar", src: me.user.picture, alt: "" }) : null,
+          el("button", { class: "btn ghost small", type: "button", onclick: logout }, ["登出"])
+        ]) : null
+      ])
     ]);
   }
 
@@ -210,20 +223,22 @@
   }
 
   function unitShell(unit, tab, body) {
-    var tabs = [["entries", "報名名單"]];
-    if (unit.role === "sysadmin" || unit.role === "admin") tabs.push(["members", "成員與驗證碼"]);
-    if (unit.role === "sysadmin") tabs.push(["settings", "單位設定"]);
+    var tabs = [["entries", "名單", "list"]];
+    if (unit.role === "sysadmin" || unit.role === "admin") tabs.push(["members", "成員", "users"]);
+    if (unit.role === "sysadmin") tabs.push(["settings", "設定", "gear"]);
 
     render([
       header(unit.name, unit.event_title + "・" + ROLE_LABEL[unit.role], "#/"),
-      el("nav", { class: "tabs", role: "tablist" }, tabs.map(function (t) {
-        return el("button", {
-          class: "tab", type: "button", role: "tab", "aria-selected": t[0] === tab ? "true" : "false",
-          onclick: function () { location.hash = "#/unit/" + unit.id + "/" + t[0]; }
-        }, [t[1]]);
-      })),
+      tabs.length > 1 ? el("nav", { class: "admin-tabs", "aria-label": "單位功能" }, [
+        el("div", { class: "admin-tabs-inner" }, tabs.map(function (t) {
+          return el("a", {
+            class: "admin-tab", href: "#/unit/" + unit.id + "/" + t[0],
+            "aria-current": t[0] === tab ? "page" : null
+          }, [icon(t[2]), el("span", { text: t[1] })]);
+        }))
+      ]) : null,
       el("main", { class: "content" }, body)
-    ]);
+    ], tabs.length > 1);
   }
 
   /* ---------- 報名名單 ---------- */
@@ -274,18 +289,17 @@
           }, ["刪除"]));
         }
 
-        return el("div", { class: "entry" }, [
-          el("div", { class: "entry-top" }, [
-            el("span", { class: "entry-name", text: e.display }),
-            el("span", { class: "chip " + e.status, text: chipText })
+        return el("div", { class: "entry" + (canEdit ? "" : " no-contact"), role: "row" }, [
+          el("span", { class: "c-id", role: "cell", text: String(e.id) }),
+          el("span", { class: "c-name", role: "cell", text: e.display }),
+          el("span", { class: "c-status", role: "cell" }, [el("span", { class: "chip " + e.status, text: chipText })]),
+          el("div", { class: "c-meta" }, [
+            canEdit ? el("span", { class: "c-real", role: "cell", text: e.name || "—" }) : null,
+            canEdit ? el("span", { class: "c-phone", role: "cell" }, [e.phone ? el("a", { href: "tel:" + e.phone, text: e.phone }) : "—"]) : null,
+            canEdit ? el("span", { class: "c-email", role: "cell" }, [e.email ? el("a", { href: "mailto:" + e.email, text: e.email }) : "—"]) : null,
+            el("span", { class: "c-time", role: "cell", text: e.created_at })
           ]),
-          el("div", { class: "entry-meta" }, [
-            e.name ? el("span", { text: e.name }) : null,
-            e.phone ? el("a", { href: "tel:" + e.phone, text: e.phone }) : null,
-            e.email ? el("a", { href: "mailto:" + e.email, text: e.email, style: "overflow-wrap:anywhere" }) : null,
-            el("span", { class: "hint", text: "報名 " + e.created_at })
-          ]),
-          actions.length ? el("div", { class: "entry-actions" }, actions) : null
+          canEdit ? el("div", { class: "c-actions", role: "cell" }, actions) : null
         ]);
       });
 
@@ -295,15 +309,30 @@
           el("div", { class: "stat" }, [el("b", { text: data.counts.wait + " / " + (unit.capacity_wait < 0 ? "不限" : unit.capacity_wait) }), el("span", { text: "備取" })]),
           el("div", { class: "stat" }, [el("b", { text: String(cancelled) }), el("span", { text: "已取消" })])
         ]),
+        el("div", { class: "toolbar" }, [
         el("div", { class: "filters" }, [
           filterButton("all", "全部"), filterButton("main", "正取"), filterButton("wait", "備取"), filterButton("cancelled", "已取消")
         ]),
-        el("div", { class: "two" }, [
+        el("div", { class: "toolbar-actions" }, [
           el("button", { class: "btn ghost", type: "button", onclick: function () { renderEntries(unit); } }, ["重新整理"]),
-          canEdit ? el("a", { class: "btn ghost", href: "/api/admin/units/" + unit.id + "/export" }, ["匯出 CSV"]) : el("a", { class: "btn ghost", href: "/u/" + unit.code, target: "_blank", rel: "noopener" }, ["開啟活動頁"])
+          canEdit ? el("a", { class: "btn", href: "/api/admin/units/" + unit.id + "/export" }, ["匯出 CSV"]) : el("a", { class: "btn ghost", href: "/u/" + unit.code, target: "_blank", rel: "noopener" }, ["開啟活動頁"])
+        ])
         ]),
         canEdit ? null : el("p", { class: "hint", style: "margin:0", text: "工作人員看不到報名者的姓名與手機。" }),
-        rows.length ? el("div", { style: "display:flex;flex-direction:column;gap:8px" }, rows) : el("p", { class: "empty", text: "目前沒有報名資料。" })
+        rows.length ? el("div", { class: "entries", role: "table", "aria-label": "報名名單" }, [
+          el("div", { class: "entry entry-head" + (canEdit ? "" : " no-contact"), role: "row" }, [
+            el("span", { class: "c-id", role: "columnheader", text: "編號" }),
+            el("span", { class: "c-name", role: "columnheader", text: "名稱" }),
+            el("span", { class: "c-status", role: "columnheader", text: "狀態" }),
+            el("div", { class: "c-meta" }, [
+              canEdit ? el("span", { class: "c-real", role: "columnheader", text: "姓名" }) : null,
+              canEdit ? el("span", { class: "c-phone", role: "columnheader", text: "手機" }) : null,
+              canEdit ? el("span", { class: "c-email", role: "columnheader", text: "Email" }) : null,
+              el("span", { class: "c-time", role: "columnheader", text: "報名時間" })
+            ]),
+            canEdit ? el("span", { class: "c-actions", role: "columnheader", text: "操作" }) : null
+          ])
+        ].concat(rows)) : el("p", { class: "empty", text: "目前沒有報名資料。" })
       ]);
     });
   }
@@ -417,7 +446,7 @@
       file.addEventListener("change", function () {
         if (!file.files || !file.files[0]) return;
         status.textContent = "上傳中…";
-        uploadImage(file.files[0]).then(function (r) {
+        uploadImage(file.files[0], kind === "cover" ? 2000 : 1600).then(function (r) {
           if (!r.success) { status.textContent = errorText(r); return; }
           images[kind] = r.data.id;
           preview.src = r.data.url;
@@ -465,7 +494,7 @@
         if (!r.success) {
           errorBox.textContent = "";
           var fields = r.fields || [];
-          errorBox.appendChild(el("div", { class: "alert", text: fields.indexOf("contact_required") !== -1 ? "手機和 Email 至少要有一個設為必填。" : errorText(r) }));
+          errorBox.appendChild(el("div", { class: "alert", text: fields.indexOf("contact_required") !== -1 ? "手機和 Email 至少要有一個設為必填。" : (fields.indexOf("line_url") !== -1 ? "LINE 官方帳號請填 @帳號ID，或 line.me、lin.ee 開頭的連結。" : errorText(r)) }));
           fields.forEach(function (key) { if (inputs[key]) inputs[key].setAttribute("aria-invalid", "true"); });
           if (fields.indexOf("contact_required") !== -1) { checks.phone_required.setAttribute("aria-invalid", "true"); checks.email_required.setAttribute("aria-invalid", "true"); }
           var first = document.querySelector("[aria-invalid]");
@@ -496,7 +525,7 @@
           el("h2", { text: "主題" }),
           field("accent", "主色", "color"),
           imageField("logo", "Logo（正方形）", false),
-          imageField("cover", "封面圖（16:9）", true),
+          imageField("cover", "封面圖／海報（橫式、直式都可以）", true),
           el("p", { class: "hint", style: "margin:0", text: "圖片超過 1MB 會自動壓縮。" })
         ]),
         el("section", { class: "card" }, [
@@ -538,7 +567,8 @@
           field("rules", "賽制", "textarea"),
           field("prizes", "獎品", "textarea"),
           field("notes", "注意事項", "textarea"),
-          field("contact", "主辦單位聯絡方式", "textarea", { max: "1000" })
+          field("contact", "主辦單位聯絡方式", "textarea", { max: "1000" }),
+          field("line_url", "LINE 官方帳號", "text", { attrs: { maxlength: "300", autocapitalize: "none", autocomplete: "off", placeholder: "@帳號ID 或 https://lin.ee/…" }, hint: "有填的話，活動頁會顯示 LINE 加好友按鈕。" })
         ]),
         errorBox,
         el("button", { class: "btn", type: "button", onclick: save }, [isNew ? "建立單位" : "儲存"])
@@ -553,7 +583,7 @@
   }
 
   /* 圖片：≤1MB 且是 PNG/JPG/WebP 直接上傳；否則壓縮成 JPG */
-  function uploadImage(file) {
+  function uploadImage(file, maxSide) {
     function readBase64(blob) {
       return new Promise(function (resolve, reject) {
         var reader = new FileReader();
@@ -569,7 +599,7 @@
         var url = URL.createObjectURL(file);
         img.onload = function () {
           URL.revokeObjectURL(url);
-          var scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+          var scale = Math.min(1, (maxSide || 1600) / Math.max(img.width, img.height));
           var canvas = document.createElement("canvas");
           canvas.width = Math.round(img.width * scale);
           canvas.height = Math.round(img.height * scale);
